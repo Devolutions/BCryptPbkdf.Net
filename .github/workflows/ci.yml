@@ -26,12 +26,12 @@ jobs:
     - name: Run tests
       run: dotnet test
 
-    - name: Place Artifacts
-      shell: bash
+    - name: Generate NuGet
       run: |
-        mv src/bin/Release/*.nupkg .
+        cd src/
+        dotnet pack -o package /p:Version=$(date "+%-Y.%-m.%-d")
 
     - uses: actions/upload-artifact@v4
       with:
         name: nugets
-        path: ./*.nupkg
+        path: src/package/*.nupkg
