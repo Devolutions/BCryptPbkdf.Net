@@ -9,6 +9,7 @@
     <RepositoryUrl>https://github.com/Devolutions/BCryptPbkdf.Net</RepositoryUrl>
     <PackageId>Devolutions.BCryptPbkdf.Net</PackageId>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>

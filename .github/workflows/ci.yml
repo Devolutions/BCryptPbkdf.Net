@@ -1,0 +1,49 @@
+name: Main
+
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      generate_release:
+        description: Generate release
+        required: true
+        type: boolean
+      version:
+        required: false
+        type: string
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+
+    - name: Run tests
+      run: dotnet test --no-build --verbosity normal
+
+    - name: Place Artifacts
+      shell: bash
+      run: |
+        mv src/bin/Release/*.nupkg .
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: nuget
+        path: ./*.nupkg
