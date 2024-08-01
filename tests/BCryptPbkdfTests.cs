@@ -21,4 +21,17 @@ public class Tests
 
         Assert.That(key, Is.EqualTo(expectedResult));
     }
+
+    [Test]
+    public void BlocksizeTest()
+    {
+        byte[] expectedResult = [188, 150, 99, 181, 247, 185, 141, 206, 200, 242, 218, 168, 93, 150, 241, 208, 29, 39, 63, 109, 180, 160, 120, 75, 34, 76, 54, 170, 244, 173, 4, 240];
+        byte[] password = Encoding.UTF8.GetBytes("qwerty");
+        byte[] salt = [1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8];
+        int rounds = 64;
+
+        byte[] key = BCryptPbkdf.Hash(password, salt, rounds, 32);
+
+        Assert.That(key, Is.EqualTo(expectedResult));
+    }
 }
