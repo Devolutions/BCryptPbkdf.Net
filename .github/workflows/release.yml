@@ -1,0 +1,60 @@
+name: Deploy to production (Nugets)
+on:
+  workflow_dispatch:
+    inputs:
+      publish_nuget:
+        description: "Publish Devolutions.BCryptPbkdf.Net"
+        required: true
+        type: boolean
+
+      publish_dry_run:
+        description: "Dry Run Mode"
+        required: true
+        type: boolean
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: publish
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check out devolutions/actions
+      uses: actions/checkout@v4
+      with:
+        path: ./.github/workflows
+        ref: v1
+        repository: Devolutions/actions
+        token: ${{ secrets.DEVOLUTIONSBOT_TOKEN }}
+
+    - name: Install toolbox
+      uses: ./.github/workflows/toolbox-install
+      with:
+        github_token: ${{ secrets.DEVOLUTIONSBOT_TOKEN }}
+
+    - name: Download Nugets Artifact
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        CI: true
+      run: |
+        dv github download-artifact nugets . BCryptPbkdf.Net
+
+    - name: Extract Artifacts
+      run: |
+        7z x nugets.zip -o./nugets
+
+    - name: Publish NuGet
+      if: ${{ inputs.publish_nuget }}
+      run: |
+        COMMAND="dotnet nuget push ./nugets/Devolutions.BCryptPbkdf.Net.*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json"
+
+        if [ '${{ inputs.publish_dry_run }}' == 'true' ]; then
+          echo "Dry Run : True"
+        else
+          echo "Dry Run : False"
+        fi
+
+        echo "Running : $COMMAND"
+
+        if [ "${{ inputs.publish_dry_run }}" != "true" ]; then # if not dry run, actually run the command
+          eval "$COMMAND"
+        fi

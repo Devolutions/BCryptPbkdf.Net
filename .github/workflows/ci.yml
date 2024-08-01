@@ -1,0 +1,37 @@
+name: Main
+
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    - name: Build
+      run: dotnet build --configuration Release
+
+    - name: Run tests
+      run: dotnet test
+
+    - name: Generate NuGet
+      run: |
+        cd src/
+        dotnet pack -o package /p:Version=$(date "+%-Y.%-m.%-d")
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: nugets
+        path: src/package/*.nupkg

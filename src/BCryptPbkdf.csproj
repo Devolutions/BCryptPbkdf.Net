@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageLicenseExpression>MIT OR Apache-2.0</PackageLicenseExpression>
+    <Authors>zer0x64 (Philippe Dugre)</Authors>
+    <Company>Devolutions</Company>
+    <Description>A pure C# implementation of bcrypt_pbkdf, used to derive passwords for OpenSSH keys.</Description>
+    <RepositoryUrl>https://github.com/Devolutions/BCryptPbkdf.Net</RepositoryUrl>
+    <PackageId>Devolutions.BCryptPbkdf.Net</PackageId>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+</Project>
