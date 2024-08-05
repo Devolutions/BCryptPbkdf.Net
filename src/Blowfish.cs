@@ -165,7 +165,7 @@
                 (left, right) = (right, left);
             }
 
-            block[0] = right ^ P[P.Length - 1];
+            block[0] = right ^ P[^1];
             block[1] = left;
         }
 

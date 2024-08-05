@@ -3,16 +3,17 @@
     internal static class Const
     {
         // A "No Card Up My Sleeve" constant used as an initial value for BCrypt.
-        public static string BCRYPT_PLAINTEXT = "OxychromaticBlowfishSwatDynamite";
+        // This is the string "OxychromaticBlowfishSwatDynamite" pre-encoded as big endian unsigned int
+        public static readonly uint[] BCRYPT_PLAINTEXT = { 0x4f787963, 0x68726f6d, 0x61746963, 0x426c6f77, 0x66697368, 0x53776174, 0x44796e61, 0x6d697465 };
 
         // Hash size of the used variant of BCrypt.
-        public static int BCRYPT_HASH_SIZE = 32;
+        public const int BCRYPT_HASH_SIZE = 32;
 
         // Number of BCrypt rounds. It is hardcoded in bcrypt_pbkdf as the configurable part is the PBKDF2 rounds.
-        public static int BCRYPT_ROUNDS = 64;
+        public const int BCRYPT_ROUNDS = 64;
 
         // Number of rounds of rounds of the blowfish's feistel network.
-        public static uint BLOWFISH_ROUNDS = 16;
+        public const uint BLOWFISH_ROUNDS = 16;
 
         // Initial value of the P table, derived from Pi.
         public static readonly uint[] PERMUTATION_TABLE_INIT = {

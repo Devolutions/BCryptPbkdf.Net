@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
 namespace BCryptPbkdf.Net
@@ -49,9 +50,8 @@ namespace BCryptPbkdf.Net
             }
 
             byte[] output = new byte[outputLength];
-            byte[] accumulator = new byte[Const.BCRYPT_HASH_SIZE];
 
-            int stride = (outputLength + accumulator.Length - 1) / accumulator.Length;
+            int stride = (outputLength + Const.BCRYPT_HASH_SIZE - 1) / Const.BCRYPT_HASH_SIZE;
             int amt = (outputLength + stride - 1) / stride;
 
             using (SHA512 sha512 = SHA512.Create())
@@ -62,8 +62,7 @@ namespace BCryptPbkdf.Net
                 // Loop here to fill the full output if the output size is larger then the bcrypt hash size
                 for (uint currentBlockNumber = 1; outputLength > 0; currentBlockNumber++)
                 {
-                    byte[] currentIterationBytes = new byte[sizeof(uint)];
-                    EndiannessHelper.EncodeToBigEndian(currentIterationBytes, 0, currentBlockNumber);
+                    byte[] currentIterationBytes = EndiannessHelper.EncodeToBigEndian(currentBlockNumber);
 
                     // First round salt is input salt | current block number
                     sha512.Initialize();
@@ -71,15 +70,14 @@ namespace BCryptPbkdf.Net
                     sha512.TransformFinalBlock(currentIterationBytes, 0, currentIterationBytes.Length);
                     byte[] sha2Salt = sha512.Hash;
 
-                    byte[] bcryptOutput = BCryptHash(sha2Pass, sha2Salt);
-                    Array.Copy(bcryptOutput, accumulator, accumulator.Length);
+                    Span<byte> bcryptOutput =  BCryptHash(sha2Pass, sha2Salt);
+
+                    byte[] accumulator = bcryptOutput.ToArray();
 
                     for (int r = 1; r < rounds; r++)
                     {
                         // PBKDF rounds
-                        sha512.Initialize();
-                        sha512.TransformFinalBlock(bcryptOutput, 0, bcryptOutput.Length);
-                        sha2Salt = sha512.Hash;
+                        sha512.TryComputeHash(bcryptOutput, sha2Salt, out _);
 
                         bcryptOutput = BCryptHash(sha2Pass, sha2Salt);
 
@@ -119,12 +117,8 @@ namespace BCryptPbkdf.Net
         /// <param name="password"></param>
         /// <param name="salt"></param>
         /// <returns></returns>
-        private static byte[] BCryptHash(byte[] password, byte[] salt)
+        private static Span<byte> BCryptHash(byte[] password, byte[] salt)
         {
-            // Initial value is a Nothing Up My Sleeve constant
-            // Note that this constant is longer for bcrypt_pbkdf then regular bcrypt
-            byte[] ciphertext = System.Text.Encoding.UTF8.GetBytes(Const.BCRYPT_PLAINTEXT);
-
             // Initialize the state.
             // This is also a standard deviation, as it uses a salt, which isn't the case with regular Blowfish.
             Blowfish blf = new Blowfish(password, salt);
@@ -137,14 +131,9 @@ namespace BCryptPbkdf.Net
                 blf.KeySchedule(password);
             }
 
-            // Parse the byte array as an array of big endian words
-            // TODO: Precompute
-            uint[] ciphertextWords = new uint[Const.BCRYPT_HASH_SIZE / 4];
-
-            for (int i = 0; i < ciphertextWords.Length; i++)
-            {
-                ciphertextWords[i] = EndiannessHelper.DecodeFromBigEndian(ciphertext, i * 4);
-            }
+            // The initial plaintext is a standardized constant, which is longer then regular bcrypt.
+            // Here it is pre-encoded as big endian unsigned int
+            uint[] ciphertextWords = (uint[])Const.BCRYPT_PLAINTEXT.Clone();
 
             // Encrypt the ciphertext over and over to get the BCrypt hash
             for (int i = 0; i < Const.BCRYPT_ROUNDS; i++)
@@ -152,13 +141,7 @@ namespace BCryptPbkdf.Net
                 ciphertextWords = blf.Encrypt(ciphertextWords);
             }
 
-            // Encode the words as little endian into a byte array to output
-            for (int i = 0; i < ciphertextWords.Length; i++)
-            {
-                EndiannessHelper.EncodeToLittleEndian(ciphertext, i * 4, ciphertextWords[i]);
-            }
-
-            return ciphertext;
+            return EndiannessHelper.EncodeToLittleEndian(ciphertextWords);
         }
     }
 }
