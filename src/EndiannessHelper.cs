@@ -1,26 +1,23 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 
 namespace BCryptPbkdf
 {
     static internal class EndiannessHelper
     {
-        public static byte[] EncodeToBigEndian(uint x)
+        public static void EncodeToBigEndian(uint x, Span<byte> output)
         {
             if (BitConverter.IsLittleEndian)
             {
-                byte[] output = new byte[sizeof(uint)];
-
                 output[0] = (byte)(x >> 24);
                 output[1] = (byte)(x >> 16);
                 output[2] = (byte)(x >> 8);
                 output[3] = (byte)x;
-
-                return output;
             }
             else
             {
-                return BitConverter.GetBytes(x);
+                new Span<byte>(BitConverter.GetBytes(x)).CopyTo(output);
             }
         }
 

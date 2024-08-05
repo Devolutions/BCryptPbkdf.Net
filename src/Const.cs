@@ -15,6 +15,9 @@
         // Number of rounds of rounds of the blowfish's feistel network.
         public const uint BLOWFISH_ROUNDS = 16;
 
+        // The siz3e of a SHA2-512 hash
+        public const int SHA512_HASH_SIZE = 64;
+
         // Initial value of the P table, derived from Pi.
         public static readonly uint[] PERMUTATION_TABLE_INIT = {
             0x243f6a88,
