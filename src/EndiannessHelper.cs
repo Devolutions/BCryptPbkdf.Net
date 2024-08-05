@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
@@ -21,27 +22,11 @@ namespace BCryptPbkdf
             }
         }
 
-        public static Span<byte> EncodeToLittleEndian(Span<uint> input)
+        public static void FlipEndianeness(Span<uint> input)
         {
-            if (!BitConverter.IsLittleEndian)
+            for (int i = 0; i < input.Length; i++)
             {
-                byte[] output = new byte[input.Length * 4];
-
-                for(int i = 0; i < input.Length; i++)
-                {
-                    uint x = input[i];
-
-                    output[i * 4] = (byte)x;
-                    output[i * 4 + 1] = (byte)(x >> 8);
-                    output[i * 4 + 2] = (byte)(x >> 16);
-                    output[i * 4 + 3] = (byte)(x >> 24);
-                }
-
-                return new Span<byte>(output);
-            }
-            else
-            {
-                return MemoryMarshal.AsBytes(input);
+                input[i] = BinaryPrimitives.ReverseEndianness(input[i]);
             }
         }
     }

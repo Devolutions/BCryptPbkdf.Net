@@ -1,27 +1,55 @@
 ﻿using System;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 
 namespace BCryptPbkdf.Net
 {
-    internal class Blowfish
+    internal class Blowfish : IDisposable
     {
         // Permutation table
         private readonly uint[] P = new uint[Const.PERMUTATION_TABLE_INIT.Length];
 
         // Substitution table
-        private readonly uint[,] S = new uint[4, 256];
+        private readonly uint[] S = new uint[4 * 256];
+
+        // Handles used to pin the arrays in memory
+        private readonly GCHandle __p_handle;
+        private readonly GCHandle __s_handle;
 
         /// <summary>
         /// Initialize an empty blowfish instance
         /// </summary>
-        public Blowfish() { }
+        public Blowfish()
+        {
+            // Pin the blowfish state to ensure it doesn't get copied
+            __p_handle = GCHandle.Alloc(P, GCHandleType.Pinned);
+            __s_handle = GCHandle.Alloc(S, GCHandleType.Pinned);
+        }
+
+        public void Dispose()
+        {
+            // Free the pinned buffers
+            __p_handle.Free();
+            __s_handle.Free();
+        }
 
         /// <summary>
         /// Initialize the Blowfish state using standardized values, derived from Pi.
         /// </summary>
         public void Initialize()
         {
-            Buffer.BlockCopy(Const.PERMUTATION_TABLE_INIT, 0, P, 0, P.Length * sizeof(uint));
-            Buffer.BlockCopy(Const.SUBSTITUTION_TABLE_INIT, 0, S, 0, S.Length * sizeof(uint));
+            Const.PERMUTATION_TABLE_INIT.CopyTo(P);
+            Const.SUBSTITUTION_TABLE_INIT.CopyTo(S);
+        }
+
+        /// <summary>
+        /// Zero out the memory of the object to overwrite sensitive information
+        /// </summary>
+        public void Zeroize()
+        {
+            CryptographicOperations.ZeroMemory(MemoryMarshal.Cast<uint, byte>(P));
+            CryptographicOperations.ZeroMemory(MemoryMarshal.Cast<uint, byte>(S));
         }
 
         /// <summary>
@@ -59,7 +87,7 @@ namespace BCryptPbkdf.Net
                 EncryptBlock(block);
 
                 P[i] = block[0];
-                P[i + 1] = block[1];
+                P[i | 1] = block[1];
             }
 
             // Process the S table using the key
@@ -69,8 +97,8 @@ namespace BCryptPbkdf.Net
                 {
                     EncryptBlock(block);
 
-                    S[i, j] = block[0];
-                    S[i, j + 1] = block[1];
+                    S[i << 8 | j] = block[0];
+                    S[i << 8 | j | 1] = block[1];
                 }
             }
         }
@@ -100,7 +128,7 @@ namespace BCryptPbkdf.Net
                 EncryptBlock(block);
 
                 P[i] = block[0];
-                P[i + 1] = block[1];
+                P[i | 1] = block[1];
             }
 
             // Process the S table using the key
@@ -113,8 +141,8 @@ namespace BCryptPbkdf.Net
 
                     EncryptBlock(block);
 
-                    S[i, j] = block[0];
-                    S[i, j + 1] = block[1];
+                    S[i << 8 | j] = block[0];
+                    S[i << 8 | j | 1] = block[1];
                 }
             }
         }
@@ -160,14 +188,15 @@ namespace BCryptPbkdf.Net
         /// </summary>
         /// <param name="x"></param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private uint Round(uint x)
         {
             // Substitution table
             return (
-                S[0, x >> 24] +
-                S[1, x >> 16 & 0xFF] ^
-                S[2, x >> 8 & 0xFF]) +
-                S[3, x & 0xFF];
+                S[x >> 24] +
+                S[0x100 | x >> 16 & 0xFF] ^
+                S[0x200 | x >> 8 & 0xFF]) +
+                S[0x300 | x & 0xFF];
         }
 
         /// <summary>
