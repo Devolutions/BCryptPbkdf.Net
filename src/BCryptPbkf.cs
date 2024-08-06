@@ -1,8 +1,9 @@
 ﻿using System;
+using System.Buffers.Binary;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
-namespace BCryptPbkdf.Net
+namespace BCryptPbkdf
 {
     public static class BCryptPbkdf
     {
@@ -76,7 +77,7 @@ namespace BCryptPbkdf.Net
                 // Loop here to fill the full output if the output size is larger then the bcrypt hash size
                 for (uint currentBlockNumber = 0; currentBlockNumber < nOutputBlock; currentBlockNumber++)
                 {
-                    EndiannessHelper.EncodeToBigEndian(currentBlockNumber + 1, saltBlock[^4..]);
+                    BinaryPrimitives.WriteUInt32BigEndian(saltBlock[^4..], currentBlockNumber + 1);
                     sha512.TryComputeHash(saltBlock, hashedSalt, out _);
 
                     BCryptHash(hashedPassword, hashedSalt, blowfish, bcryptOutput);
@@ -159,7 +160,10 @@ namespace BCryptPbkdf.Net
             // We need to return the data as little endian
             if (!BitConverter.IsLittleEndian)
             {
-                EndiannessHelper.FlipEndianeness(ciphertextWords);
+                for (int i = 0; i < ciphertextWords.Length; i++)
+                {
+                    ciphertextWords[i] = BinaryPrimitives.ReverseEndianness(ciphertextWords[i]);
+                }
             }
         }
     }
