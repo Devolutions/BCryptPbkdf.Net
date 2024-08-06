@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <TargetFramework>netstandard2.1</TargetFramework>
     <PackageLicenseExpression>MIT OR Apache-2.0</PackageLicenseExpression>
     <Authors>zer0x64 (Philippe Dugre)</Authors>
     <Company>Devolutions</Company>
@@ -17,5 +17,4 @@
       <PackagePath>\</PackagePath>
     </None>
   </ItemGroup>
-
 </Project>

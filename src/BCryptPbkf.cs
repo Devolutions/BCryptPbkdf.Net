@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
 namespace BCryptPbkdf.Net
@@ -30,15 +31,15 @@ namespace BCryptPbkdf.Net
         /// Throws when there is less then two rounds.
         /// Throws when the password, salt or input length in empty.
         /// </exception>
-        public static byte[] Hash(byte[] password, byte[] salt, int rounds, int outputLength)
+        public static byte[] Hash(ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, uint rounds, int outputLength)
         {
             // Check parameters
-            if (password is null)
+            if (password == null)
             {
                 throw new ArgumentNullException(nameof(password));
             }
 
-            if (salt is null)
+            if (salt == null)
             {
                 throw new ArgumentNullException(nameof(salt));
             }
@@ -49,68 +50,75 @@ namespace BCryptPbkdf.Net
             }
 
             byte[] output = new byte[outputLength];
-            byte[] accumulator = new byte[Const.BCRYPT_HASH_SIZE];
+            int nOutputBlock = (outputLength + Const.BCRYPT_HASH_SIZE - 1) / Const.BCRYPT_HASH_SIZE;
 
-            int stride = (outputLength + accumulator.Length - 1) / accumulator.Length;
-            int amt = (outputLength + stride - 1) / stride;
+            // Pin sensitive data so it doesn't get copied around
+            byte[] bcryptOutput = new byte[Const.BCRYPT_HASH_SIZE];
+            byte[] hashedPassword = new byte[Const.SHA512_HASH_SIZE];
+            GCHandle hashedPasswordHandle = GCHandle.Alloc(hashedPassword, GCHandleType.Pinned);
+            GCHandle bcryptOutputHandle = GCHandle.Alloc(bcryptOutput, GCHandleType.Pinned);
 
-            using (SHA512 sha512 = SHA512.Create())
+            // Reuse the same blowfish engine for each iteration to avoid unnecessary allocations
+            using Blowfish blowfish = new Blowfish();
+            using SHA512 sha512 = SHA512.Create();
+
+            try
             {
                 // Prehash password for size normalization
-                byte[] sha2Pass = sha512.ComputeHash(password);
+                sha512.TryComputeHash(password, hashedPassword, out _);
+
+                // This is the block that will be reused as salt for multiple blocks
+                Span<byte> saltBlock = new Span<byte>(new byte[salt.Length + sizeof(uint)]);
+                salt.CopyTo(saltBlock);
+
+                byte[] hashedSalt = new byte[Const.SHA512_HASH_SIZE];
 
                 // Loop here to fill the full output if the output size is larger then the bcrypt hash size
-                for (uint currentBlockNumber = 1; outputLength > 0; currentBlockNumber++)
+                for (uint currentBlockNumber = 0; currentBlockNumber < nOutputBlock; currentBlockNumber++)
                 {
-                    byte[] currentIterationBytes = new byte[sizeof(uint)];
-                    EndiannessHelper.EncodeToBigEndian(currentIterationBytes, 0, currentBlockNumber);
+                    EndiannessHelper.EncodeToBigEndian(currentBlockNumber + 1, saltBlock[^4..]);
+                    sha512.TryComputeHash(saltBlock, hashedSalt, out _);
 
-                    // First round salt is input salt | current block number
-                    sha512.Initialize();
-                    sha512.TransformBlock(salt, 0, salt.Length, salt, 0);
-                    sha512.TransformFinalBlock(currentIterationBytes, 0, currentIterationBytes.Length);
-                    byte[] sha2Salt = sha512.Hash;
+                    BCryptHash(hashedPassword, hashedSalt, blowfish, bcryptOutput);
 
-                    byte[] bcryptOutput = BCryptHash(sha2Pass, sha2Salt);
-                    Array.Copy(bcryptOutput, accumulator, accumulator.Length);
+                    // Copies output bytes non-linearly
+                    for (int i = 0; i < output.Length / nOutputBlock; i++)
+                    {
+                        int dest = i * nOutputBlock + (int)currentBlockNumber;
+                        output[dest] = bcryptOutput[i];
+                    }
 
-                    for (int r = 1; r < rounds; r++)
+                    for (uint r = 1; r < rounds; r++)
                     {
                         // PBKDF rounds
-                        sha512.Initialize();
-                        sha512.TransformFinalBlock(bcryptOutput, 0, bcryptOutput.Length);
-                        sha2Salt = sha512.Hash;
+                        sha512.TryComputeHash(bcryptOutput, hashedSalt, out _);
 
-                        bcryptOutput = BCryptHash(sha2Pass, sha2Salt);
+                        BCryptHash(hashedPassword, hashedSalt, blowfish, bcryptOutput);
 
-                        // XOR the bcrypt output into the accumulator
-                        for (int i = 0; i < accumulator.Length; i++)
+                        // XOR the bcrypt output into the output non-linearly
+                        for (int i = 0; i < output.Length / nOutputBlock; i++)
                         {
-                            accumulator[i] ^= bcryptOutput[i];
+                            int dest = i * nOutputBlock + (int)currentBlockNumber;
+                            output[dest] ^= bcryptOutput[i];
                         }
                     }
-
-                    // Output key material
-                    // Instead of outputing from left to right, this PBKDF2 variation fills 
-                    //   the output blocks by slices.
-                    // TODO: See if we can avoid a copy
-                    amt = Math.Min(amt, outputLength);
-                    int currentKeyOutput = 0;
-
-                    for (; currentKeyOutput < amt; currentKeyOutput++)
-                    {
-                        int dest = currentKeyOutput * stride + ((int)currentBlockNumber - 1);
-                        if (dest >= output.Length)
-                        {
-                            break;
-                        }
-                        output[dest] = accumulator[currentKeyOutput];
-                    }
-                    outputLength -= currentKeyOutput;
                 }
+            }
+            finally
+            {
+                // Make sure we don't forget to zeroize and free
+                // Zeroize sensitive memory
+                blowfish.Zeroize();
+                CryptographicOperations.ZeroMemory(hashedPassword);
+                CryptographicOperations.ZeroMemory(bcryptOutput);
 
-                return output;
-            };
+                // Free handles to unpin data
+                blowfish.Dispose();
+                hashedPasswordHandle.Free();
+                bcryptOutputHandle.Free();
+            }
+
+            return output;
         }
 
         /// <summary>
@@ -119,15 +127,12 @@ namespace BCryptPbkdf.Net
         /// <param name="password"></param>
         /// <param name="salt"></param>
         /// <returns></returns>
-        private static byte[] BCryptHash(byte[] password, byte[] salt)
+        private static void BCryptHash(ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt, Blowfish blf, Span<byte> output)
         {
-            // Initial value is a Nothing Up My Sleeve constant
-            // Note that this constant is longer for bcrypt_pbkdf then regular bcrypt
-            byte[] ciphertext = System.Text.Encoding.UTF8.GetBytes(Const.BCRYPT_PLAINTEXT);
-
             // Initialize the state.
-            // This is also a standard deviation, as it uses a salt, which isn't the case with regular Blowfish.
-            Blowfish blf = new Blowfish(password, salt);
+            // This is also a deviation from the standard, as it uses a salt, which isn't the case with regular Blowfish.
+            blf.Initialize();
+            blf.KeySchedule(password, salt);
 
             // Key Expansion
             // This is the slow part of BCrypt
@@ -137,28 +142,25 @@ namespace BCryptPbkdf.Net
                 blf.KeySchedule(password);
             }
 
-            // Parse the byte array as an array of big endian words
-            // TODO: Precompute
-            uint[] ciphertextWords = new uint[Const.BCRYPT_HASH_SIZE / 4];
+            // We process the data as words instead of bytes.
+            // Since the data isn't initialized, we don't care about endianneness
+            Span<uint> ciphertextWords = MemoryMarshal.Cast<byte, uint>(output);
 
-            for (int i = 0; i < ciphertextWords.Length; i++)
-            {
-                ciphertextWords[i] = EndiannessHelper.DecodeFromBigEndian(ciphertext, i * 4);
-            }
+            // The initial plaintext is a standardized constant, which is longer then regular bcrypt.
+            // Here it is pre-encoded as big endian unsigned int
+            Const.BCRYPT_PLAINTEXT.Span.CopyTo(ciphertextWords);
 
             // Encrypt the ciphertext over and over to get the BCrypt hash
             for (int i = 0; i < Const.BCRYPT_ROUNDS; i++)
             {
-                ciphertextWords = blf.Encrypt(ciphertextWords);
+                blf.Encrypt(ciphertextWords);
             }
 
-            // Encode the words as little endian into a byte array to output
-            for (int i = 0; i < ciphertextWords.Length; i++)
+            // We need to return the data as little endian
+            if (!BitConverter.IsLittleEndian)
             {
-                EndiannessHelper.EncodeToLittleEndian(ciphertext, i * 4, ciphertextWords[i]);
+                EndiannessHelper.FlipEndianeness(ciphertextWords);
             }
-
-            return ciphertext;
         }
     }
 }

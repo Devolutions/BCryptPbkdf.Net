@@ -1,49 +1,33 @@
 ﻿using System;
+using System.Buffers.Binary;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 
 namespace BCryptPbkdf
 {
     static internal class EndiannessHelper
     {
-        public static void EncodeToBigEndian(byte[] output, int offset, uint x)
+        public static void EncodeToBigEndian(uint x, Span<byte> output)
         {
             if (BitConverter.IsLittleEndian)
             {
-                output[offset] = (byte)(x >> 24);
-                output[offset + 1] = (byte)(x >> 16);
-                output[offset + 2] = (byte)(x >> 8);
-                output[offset + 3] = (byte)x;
+                output[0] = (byte)(x >> 24);
+                output[1] = (byte)(x >> 16);
+                output[2] = (byte)(x >> 8);
+                output[3] = (byte)x;
             }
             else
             {
-                byte[] bits = BitConverter.GetBytes(x);
-
-                Array.Copy(bits, 0, output, offset, bits.Length);
-            }
-        }
-        public static void EncodeToLittleEndian(byte[] output, int offset, uint x)
-        {
-            if (!BitConverter.IsLittleEndian)
-            {
-                output[offset] = (byte)x;
-                output[offset + 1] = (byte)(x >> 8);
-                output[offset + 2] = (byte)(x >> 16);
-                output[offset + 3] = (byte)(x >> 24);
-            }
-            else
-            {
-                byte[] bits = BitConverter.GetBytes(x);
-
-                Array.Copy(bits, 0, output, offset, bits.Length);
+                new Span<byte>(BitConverter.GetBytes(x)).CopyTo(output);
             }
         }
 
-        public static uint DecodeFromBigEndian(byte[] x, int offset)
+        public static void FlipEndianeness(Span<uint> input)
         {
-            return (uint)(
-                x[offset] << 24 | 
-                x[offset + 1] << 16 | 
-                x[offset + 2] << 8 | 
-                x[offset + 3]);
+            for (int i = 0; i < input.Length; i++)
+            {
+                input[i] = BinaryPrimitives.ReverseEndianness(input[i]);
+            }
         }
     }
 }

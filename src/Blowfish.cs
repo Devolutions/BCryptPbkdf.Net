@@ -1,41 +1,55 @@
-﻿namespace BCryptPbkdf.Net
+﻿using System;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+
+namespace BCryptPbkdf.Net
 {
-    internal class Blowfish
+    internal class Blowfish : IDisposable
     {
         // Permutation table
-        private uint[] P;
+        private readonly uint[] P = new uint[Const.PERMUTATION_TABLE_INIT.Length];
 
         // Substitution table
-        private uint[,] S;
+        private readonly uint[] S = new uint[4 * 256];
+
+        // Handles used to pin the arrays in memory
+        private readonly GCHandle __p_handle;
+        private readonly GCHandle __s_handle;
 
         /// <summary>
-        /// Initialize the blowfish instance using only a key.
+        /// Initialize an empty blowfish instance
         /// </summary>
-        /// <param name="key"></param>
-        public Blowfish(byte[] key)
+        public Blowfish()
         {
-            Initialize();
-            KeySchedule(key);
+            // Pin the blowfish state to ensure it doesn't get copied
+            __p_handle = GCHandle.Alloc(P, GCHandleType.Pinned);
+            __s_handle = GCHandle.Alloc(S, GCHandleType.Pinned);
         }
 
-        /// <summary>
-        /// Initialize the blowfish instance using a key and a salt. This is not a standard Blowfish function.
-        /// </summary>
-        /// <param name="key"></param>
-        /// <param name="salt"></param>
-        public Blowfish(byte[] key, byte[] salt)
+        public void Dispose()
         {
-            Initialize();
-            KeySchedule(key, salt);
+            // Free the pinned buffers
+            __p_handle.Free();
+            __s_handle.Free();
         }
 
         /// <summary>
         /// Initialize the Blowfish state using standardized values, derived from Pi.
         /// </summary>
-        private void Initialize()
+        public void Initialize()
         {
-            P = (uint[])Const.PERMUTATION_TABLE_INIT.Clone();
-            S = (uint[,])Const.SUBSTITUTION_TABLE_INIT.Clone();
+            Const.PERMUTATION_TABLE_INIT.CopyTo(P);
+            Const.SUBSTITUTION_TABLE_INIT.CopyTo(S);
+        }
+
+        /// <summary>
+        /// Zero out the memory of the object to overwrite sensitive information
+        /// </summary>
+        public void Zeroize()
+        {
+            CryptographicOperations.ZeroMemory(MemoryMarshal.Cast<uint, byte>(P));
+            CryptographicOperations.ZeroMemory(MemoryMarshal.Cast<uint, byte>(S));
         }
 
         /// <summary>
@@ -43,28 +57,20 @@
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
-        public uint[] Encrypt(uint[] data)
+        public void Encrypt(Span<uint> data)
         {
-            // TODO: Remove copies
             // Process block by block in ECB
             for (int i = 0; i < data.Length; i += 2)
             {
-                uint[] block = { data[i], data[i + 1] };
-
-                EncryptBlock(block);
-
-                data[i] = block[0];
-                data[i + 1] = block[1];
+                EncryptBlock(data[i..(i + 2)]);
             }
-
-            return data;
         }
 
         /// <summary>
         /// Process the state using a key. This is public because this is used directly by Bcrypt.
         /// </summary>
         /// <param name="key"></param>
-        public void KeySchedule(byte[] key)
+        public void KeySchedule(ReadOnlySpan<byte> key)
         {
             // Mix the key with the P table
             int index = 0;
@@ -81,7 +87,7 @@
                 EncryptBlock(block);
 
                 P[i] = block[0];
-                P[i + 1] = block[1];
+                P[i | 1] = block[1];
             }
 
             // Process the S table using the key
@@ -91,8 +97,8 @@
                 {
                     EncryptBlock(block);
 
-                    S[i, j] = block[0];
-                    S[i, j + 1] = block[1];
+                    S[i << 8 | j] = block[0];
+                    S[i << 8 | j | 1] = block[1];
                 }
             }
         }
@@ -102,7 +108,7 @@
         /// </summary>
         /// <param name="key"></param>
         /// <param name="salt"></param>
-        private void KeySchedule(byte[] key, byte[] salt)
+        public void KeySchedule(ReadOnlySpan<byte> key, ReadOnlySpan<byte> salt)
         {
             // Mix the key with the P table
             int index = 0;
@@ -122,7 +128,7 @@
                 EncryptBlock(block);
 
                 P[i] = block[0];
-                P[i + 1] = block[1];
+                P[i | 1] = block[1];
             }
 
             // Process the S table using the key
@@ -135,8 +141,8 @@
 
                     EncryptBlock(block);
 
-                    S[i, j] = block[0];
-                    S[i, j + 1] = block[1];
+                    S[i << 8 | j] = block[0];
+                    S[i << 8 | j | 1] = block[1];
                 }
             }
         }
@@ -146,26 +152,34 @@
         /// You must pass an array of 2 uints to this.
         /// </summary>
         /// <param name="block"></param>
-        private void EncryptBlock(uint[] block)
+        private void EncryptBlock(Span<uint> block)
         {
             // Encrypts one block.
-            // TODO: Avoid copies
             uint left = block[0];
             uint right = block[1];
 
             left ^= P[0];
 
             // Feistel network
-            // TODO: Unroll?
-            for (int i = 1; i < Const.BLOWFISH_ROUNDS + 1; i++)
-            {
-                right ^= Round(left) ^ P[i];
+            // The loop is unrolled for performance reason
+            right ^= Round(left) ^ P[1];
+            left ^= Round(right) ^ P[2];
+            right ^= Round(left) ^ P[3];
+            left ^= Round(right) ^ P[4];
+            right ^= Round(left) ^ P[5];
+            left ^= Round(right) ^ P[6];
+            right ^= Round(left) ^ P[7];
+            left ^= Round(right) ^ P[8];
+            right ^= Round(left) ^ P[9];
+            left ^= Round(right) ^ P[10];
+            right ^= Round(left) ^ P[11];
+            left ^= Round(right) ^ P[12];
+            right ^= Round(left) ^ P[13];
+            left ^= Round(right) ^ P[14];
+            right ^= Round(left) ^ P[15];
+            left ^= Round(right) ^ P[16];
 
-                // Invert the blocks
-                (left, right) = (right, left);
-            }
-
-            block[0] = right ^ P[P.Length - 1];
+            block[0] = right ^ P[^1];
             block[1] = left;
         }
 
@@ -174,14 +188,15 @@
         /// </summary>
         /// <param name="x"></param>
         /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private uint Round(uint x)
         {
             // Substitution table
             return (
-                S[0, x >> 24] +
-                S[1, x >> 16 & 0xFF] ^
-                S[2, x >> 8 & 0xFF]) +
-                S[3, x & 0xFF];
+                S[x >> 24] +
+                S[0x100 | x >> 16 & 0xFF] ^
+                S[0x200 | x >> 8 & 0xFF]) +
+                S[0x300 | x & 0xFF];
         }
 
         /// <summary>
@@ -190,7 +205,7 @@
         /// <param name="data"></param>
         /// <param name="current"></param>
         /// <returns></returns>
-        private static uint ExtractWord(byte[] data, ref int current)
+        private static uint ExtractWord(ReadOnlySpan<byte> data, ref int current)
         {
             uint accumulator = 0;
 
