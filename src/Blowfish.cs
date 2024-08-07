@@ -29,6 +29,9 @@ namespace BCryptPbkdf
 
         public void Dispose()
         {
+            // Zeroize memory
+            Zeroize();
+
             // Free the pinned buffers
             __p_handle.Free();
             __s_handle.Free();

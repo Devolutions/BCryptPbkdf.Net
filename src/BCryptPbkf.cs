@@ -109,7 +109,6 @@ namespace BCryptPbkdf
             {
                 // Make sure we don't forget to zeroize and free
                 // Zeroize sensitive memory
-                blowfish.Zeroize();
                 CryptographicOperations.ZeroMemory(hashedPassword);
                 CryptographicOperations.ZeroMemory(bcryptOutput);
 
