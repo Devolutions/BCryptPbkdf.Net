@@ -8,14 +8,16 @@ namespace BCryptPbkdf
     internal class Blowfish : IDisposable
     {
         // Permutation table
-        private readonly uint[] P = new uint[Const.PERMUTATION_TABLE_INIT.Length];
+        private readonly uint[] P;
 
         // Substitution table
-        private readonly uint[] S = new uint[4 * 256];
+        private readonly uint[] S;
 
         // Handles used to pin the arrays in memory
         private readonly GCHandle __p_handle;
         private readonly GCHandle __s_handle;
+
+        private bool _disposed = false;
 
         /// <summary>
         /// Initialize an empty blowfish instance
@@ -23,18 +25,36 @@ namespace BCryptPbkdf
         public Blowfish()
         {
             // Pin the blowfish state to ensure it doesn't get copied
+            P = new uint[Const.PERMUTATION_TABLE_INIT.Length];
             __p_handle = GCHandle.Alloc(P, GCHandleType.Pinned);
+
+            S = new uint[Const.SUBSTITUTION_TABLE_INIT.Length];
             __s_handle = GCHandle.Alloc(S, GCHandleType.Pinned);
+        }
+
+        ~Blowfish() {
+            Dispose(false);
         }
 
         public void Dispose()
         {
-            // Zeroize memory
-            Zeroize();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
 
-            // Free the pinned buffers
-            __p_handle.Free();
-            __s_handle.Free();
+        protected virtual void Dispose(bool _)
+        {
+            if (!_disposed)
+            {
+                // Zeroize memory
+                Zeroize();
+
+                // Free the pinned buffers
+                __p_handle.Free();
+                __s_handle.Free();
+
+                _disposed = true;
+            }
         }
 
         /// <summary>
