@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace BCryptPbkdf.Net.Tests;
+namespace BCryptPbkdf.Tests;
 
 public class Tests
 {

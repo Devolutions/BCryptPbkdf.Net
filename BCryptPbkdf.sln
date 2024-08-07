@@ -5,7 +5,7 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BCryptPbkdf", "src\BCryptPbkdf.csproj", "{60D282B5-E49D-4356-B998-3CADEE03D4A5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BCryptPbkdf.Net.Tests", "tests\BCryptPbkdf.Net.Tests.csproj", "{6806830A-621D-43FB-BE09-5D16D0347163}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BCryptPbkdf.Tests", "tests\BCryptPbkdf.Tests.csproj", "{6806830A-621D-43FB-BE09-5D16D0347163}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

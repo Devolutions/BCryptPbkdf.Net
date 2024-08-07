@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace BCryptPbkdf.Net
+namespace BCryptPbkdf
 {
     internal static class Const
     {

@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
-namespace BCryptPbkdf.Net
+namespace BCryptPbkdf
 {
     internal class Blowfish : IDisposable
     {
@@ -29,6 +29,9 @@ namespace BCryptPbkdf.Net
 
         public void Dispose()
         {
+            // Zeroize memory
+            Zeroize();
+
             // Free the pinned buffers
             __p_handle.Free();
             __s_handle.Free();
