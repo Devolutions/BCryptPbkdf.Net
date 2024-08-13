@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BCryptPbkdf", "src\BCryptPb
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BCryptPbkdf.Tests", "tests\BCryptPbkdf.Tests.csproj", "{6806830A-621D-43FB-BE09-5D16D0347163}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BCryptPbkdf.Benchmarks", "BCryptPbkdf.Benchmarks\BCryptPbkdf.Benchmarks.csproj", "{F92BB30D-BD90-40F2-AA05-6081B5DFB00F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{6806830A-621D-43FB-BE09-5D16D0347163}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6806830A-621D-43FB-BE09-5D16D0347163}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6806830A-621D-43FB-BE09-5D16D0347163}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F92BB30D-BD90-40F2-AA05-6081B5DFB00F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F92BB30D-BD90-40F2-AA05-6081B5DFB00F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F92BB30D-BD90-40F2-AA05-6081B5DFB00F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F92BB30D-BD90-40F2-AA05-6081B5DFB00F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
