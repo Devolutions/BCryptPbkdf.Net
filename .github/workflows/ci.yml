@@ -31,7 +31,7 @@ jobs:
         cd src/
         dotnet pack -o package /p:Version=$(date "+%-Y.%-m.%-d")
 
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4.3.6
       with:
         name: nugets
         path: src/package/*.nupkg
